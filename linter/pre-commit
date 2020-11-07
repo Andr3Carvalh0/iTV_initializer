@@ -1,0 +1,33 @@
+#!/bin/sh
+export PATH=/usr/local/bin:$PATH
+
+ktlint_remote_version="$(curl -s -X GET https://raw.githubusercontent.com/Andr3Carvalh0/iTV_initializer/master/ktlint.txt 2> /dev/null)"
+ktlint_version="${ktlint_remote_version:=0.39.0}"
+
+ktlint_error="Aborting commit...\nPlease install the latest version of ktlint by running the setup script in the utilities folder."
+
+installed=$(ktlint -V 2> /dev/null)
+
+if [ "$installed" != "$ktlint_version" ]; then 
+	echo "$ktlint_error" >&2
+	exit 1
+fi
+
+# Ktlint check 
+git diff --name-only --cached --relative | grep '\.kt[s"]\?$' | xargs ktlint --relative .
+if [ $? -ne 0 ]; then exit 1; fi
+
+changed=$(git diff --name-only --cached)
+
+if [[ -z "$changed" ]]; then
+    exit 0
+fi
+
+# Check for merge conflicts
+echo $changed | xargs egrep '^[><=]{7}( |$)' -H -I --line-number
+
+if [ $? == 0 ]; then
+	echo ""
+    echo "Aborting commit...\nA merge is in progress. Please fix it 1st before committing!"
+    exit 1
+fi
